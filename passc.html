@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Strength Checker</title>
+    <style>
+        /* General Body Styling */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+            align-items: center;
+        }
+
+        /* Password Checker Container */
+        .password-container {
+            width: 400px;
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            margin-top: -50px;
+        }
+
+        /* Heading Style */
+        h2 {
+            margin-bottom: 20px;
+            font-size: 24px;
+            color: #333;
+            text-align: center;
+        }
+
+        /* Password Input Field */
+        .password-input-container {
+            position: relative;
+        }
+
+        .password-input {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        .password-input:focus {
+            border-color: #3b82f6;
+            outline: none;
+        }
+
+        /* Eye Icon Styling */
+        .eye-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #333;
+        }
+
+        /* Strength Meter Styling */
+        .strength-meter {
+            height: 10px;
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .strength-meter div {
+            height: 100%;
+            transition: width 0.3s;
+        }
+
+        /* Feedback and Information Text Styling */
+        .feedback,
+        .suggestions,
+        .info {
+            font-size: 14px;
+            margin-top: 15px;
+            color: #333;
+            line-height: 1.5;
+        }
+
+        .suggestions {
+            font-style: italic;
+            color: #e74c3c;
+        }
+
+        .info p {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .info p span {
+            font-weight: bold;
+        }
+
+        /* Guesses, Dictionary, and Matched Word Styling */
+        .guesses,
+        .dictionary-matches {
+            font-size: 14px;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .dictionary-matches p {
+            margin: 5px 0;
+        }
+
+        .dictionary-matches span,
+        .guesses span {
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="password-container">
+        <h2>Password Strength Checker</h2>
+        <label for="password">Enter Password:</label>
+
+        <!-- Password Input with Eye Icon -->
+        <div class="password-input-container">
+            <input type="password" id="password" class="password-input" placeholder="Type your password...">
+            <i class="fas fa-eye eye-icon" id="icochange" onclick="toggle()"></i>
+        </div>
+
+        <!-- Strength Meter -->
+        <div class="strength-meter">
+            <div></div>
+        </div>
+
+        <!-- Feedback Sections -->
+        <div class="feedback">Enter a password to see the strength.</div>
+        <div class="suggestions"></div>
+
+        <!-- Additional Information Section -->
+        <div class="info">
+            <p><span>Crack Time:</span> <span id="crack-time">N/A</span></p>
+            <p><span>Score:</span> <span id="score">0</span></p>
+            <p><span>Attack Method:</span> <span id="attack-method">N/A</span></p>
+        </div>
+
+        <!-- Guesses Section (Hidden by default) -->
+        <div class="guesses" id="guesses">
+            <p><span>Bruteforce Guesses:</span> <span id="guesses-count">N/A</span></p>
+        </div>
+
+        <!-- Dictionary Matches Section (Hidden by default) -->
+        <div class="dictionary-matches" id="dictionary-matches">
+            <p><span>Dictionary Name:</span> <span id="dictionary-name">N/A</span></p>
+            <p><span>Matched Word:</span> <span id="matched-word">N/A</span></p>
+        </div>
+    </div>
+
+    <!-- Font Awesome for the eye icon -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/js/all.min.js"></script>
+
+    <!-- Include zxcvbn library from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/zxcvbn@4.4.2/dist/zxcvbn.js"></script>
+
+    <script>
+        const passwordInput = document.getElementById('password');
+        const strengthMeter = document.querySelector('.strength-meter div');
+        const feedbackText = document.querySelector('.feedback');
+        const suggestionsText = document.querySelector('.suggestions');
+        const crackTimeDisplay = document.getElementById('crack-time');
+        const scoreDisplay = document.getElementById('score');
+        const attackMethodDisplay = document.getElementById('attack-method');
+        const guessesSection = document.getElementById('guesses');
+        const guessesCountDisplay = document.getElementById('guesses-count');
+        const dictionaryMatchesSection = document.getElementById('dictionary-matches');
+        const dictionaryNameDisplay = document.getElementById('dictionary-name');
+        const matchedWordDisplay = document.getElementById('matched-word');
+
+        // Colors for password strength
+        const colors = ['#e74c3c', '#f39c12', '#f1c40f', '#27ae60', '#2ecc71'];
+
+        // Toggle password visibility
+        function toggle () {
+            // Toggle the type attribute
+        
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+
+            // Toggle the eye icon
+            const eyeIcon = document.getElementById('icochange');
+            if (eyeIcon.classList.contains('fa-eye')) {
+                eyeIcon.classList.remove('fa-eye');
+                eyeIcon.classList.add('fa-eye-slash');
+            } else {
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
+            }
+        };
+
+
+        // Event listener to track input changes in the password field
+        passwordInput.addEventListener('input', function () {
+            const password = passwordInput.value;
+            const result = zxcvbn(password);
+
+            // If password field is empty, clear all fields and reset the UI
+            if (password === '') {
+                strengthMeter.style.width = '0%';
+                strengthMeter.style.backgroundColor = '#e0e0e0';
+                feedbackText.textContent = 'Enter a password to see the strength.';
+                suggestionsText.textContent = '';
+                crackTimeDisplay.textContent = 'N/A';
+                scoreDisplay.textContent = '0';
+                attackMethodDisplay.textContent = 'N/A';
+                guessesSection.style.display = 'none';
+                dictionaryMatchesSection.style.display = 'none';
+                guessesCountDisplay.textContent = 'N/A';
+                dictionaryNameDisplay.textContent = 'N/A';
+                matchedWordDisplay.textContent = 'N/A';
+                return;
+            }
+
+            // Update strength meter color and width
+            const score = result.score;
+            strengthMeter.style.width = (score + 1) * 20 + '%';
+            strengthMeter.style.backgroundColor = colors[score];
+
+            // Show feedback
+            feedbackText.textContent = result.feedback.suggestions.length > 0
+                ? 'Suggestions: ' + result.feedback.suggestions.join(', ')
+                : 'Password looks good!';
+
+            suggestionsText.textContent = result.feedback.warning
+                ? 'Warning: ' + result.feedback.warning
+                : '';
+
+            // Display crack times, score, and best attack method
+            crackTimeDisplay.textContent = result.crack_times_display.online_no_throttling_10_per_second;
+            scoreDisplay.textContent = result.score;
+            const attackMethods = result.sequence.map(seq => seq.pattern).join(', ');
+            attackMethodDisplay.textContent = attackMethods || 'Unknown';
+
+            // Show/hide guesses if attack method is bruteforce
+            if (attackMethods.includes('bruteforce')) {
+                guessesSection.style.display = 'block';
+                guessesCountDisplay.textContent = result.guesses.toLocaleString();
+            } else {
+                guessesSection.style.display = 'none';
+            }
+
+            // Show/hide dictionary and matched word if there is a dictionary match
+            const dictionaryMatches = result.sequence.find(seq => seq.dictionary_name);
+            if (dictionaryMatches) {
+                dictionaryMatchesSection.style.display = 'block';
+                dictionaryNameDisplay.textContent = dictionaryMatches.dictionary_name;
+                matchedWordDisplay.textContent = dictionaryMatches.matched_word;
+            } else {
+                dictionaryMatchesSection.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+
+</html>
